@@ -28,10 +28,12 @@
  * desc
  *
  */
-
+#include <ctime>
 #include <car.hpp>
 #include <traffic.hpp>
 #include <boost/iterator/iterator_concepts.hpp>
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/random/discrete_distribution.hpp>
 
 justine::robocar::Car::Car (
   justine::robocar::Traffic & traffic,
@@ -108,9 +110,9 @@ osmium::unsigned_object_id_type justine::robocar::AntCar::ant ( void )
 
   AdjacencyList::iterator iter= AntCar::alist.find ( m_from );
 
-  WayNodesVect::iterator i = std::max_element ( iter->second.begin(), iter->second.end() );
+  WayNodesVect::iterator i = std::max_element ( iter->second.first.begin(), iter->second.first.end() );
 
-  osmium::unsigned_object_id_type next_m_to = std::distance ( iter->second.begin(), i );
+  osmium::unsigned_object_id_type next_m_to = std::distance ( iter->second.first.begin(), i );
 
   ++*i;
 
@@ -122,21 +124,21 @@ osmium::unsigned_object_id_type justine::robocar::AntCar::ant_rnd ( void )
 
   AdjacencyList::iterator iter= AntCar::alist.find ( m_from );
 
-  int sum = std::accumulate ( iter->second.begin(), iter->second.end(), 0 );
+  int sum = std::accumulate ( iter->second.first.begin(), iter->second.first.end(), 0 );
 
   int rnd = std::rand() % sum;
 
   int sum2 = 0;
 
-  WayNodesVect::iterator j=iter->second.begin();
-  for ( ; j!= iter->second.end(); ++j )
+  WayNodesVect::iterator j=iter->second.first.begin();
+  for ( ; j!= iter->second.first.end(); ++j )
     {
       sum2 += *j;
       if ( sum2 >= rnd )
         break;
     }
 
-  osmium::unsigned_object_id_type next_m_to = std::distance ( iter->second.begin(), j );
+  osmium::unsigned_object_id_type next_m_to = std::distance ( iter->second.first.begin(), j );
 
   ++*j;
 
@@ -148,7 +150,7 @@ osmium::unsigned_object_id_type justine::robocar::AntCar::ant_rernd ( void )
 
   AdjacencyList::iterator iter= AntCar::alist.find ( m_from );
 
-  WayNodesVect cpv = iter->second;
+  WayNodesVect cpv = iter->second.first;
 
   int sum = std::accumulate ( cpv.begin(), cpv.end(), 0 );
 
@@ -183,10 +185,10 @@ osmium::unsigned_object_id_type justine::robocar::AntCar::ant_mrernd ( void )
   AdjacencyList::iterator iter = AntCar::alist.find ( m_from );
   AdjacencyList::iterator iter2 = AntCar::alist_evaporate.find ( m_from );
 
-  for ( WayNodesVect::iterator j=iter->second.begin(); j!= iter->second.end(); ++j )
+  for ( WayNodesVect::iterator j=iter->second.first.begin(); j!= iter->second.first.end(); ++j )
     {
 
-      int del = traffic.get_time() - iter2->second[std::distance ( iter->second.begin(), j )];
+      int del = traffic.get_time() - iter2->second.first  [std::distance ( iter->second.first.begin(), j )];
 
       int pheromone = *j - del;
 
@@ -194,7 +196,7 @@ osmium::unsigned_object_id_type justine::robocar::AntCar::ant_mrernd ( void )
       else *j = 1;
     }
 
-  WayNodesVect cpv = iter->second;
+  WayNodesVect cpv = iter->second.first;
 
   int sum = std::accumulate ( cpv.begin(), cpv.end(), 0 );
 
@@ -220,7 +222,7 @@ osmium::unsigned_object_id_type justine::robocar::AntCar::ant_mrernd ( void )
   osmium::unsigned_object_id_type next_m_to = std::distance ( cpv.begin(), j );
 
   ++*j;
-  iter2->second[std::distance (cpv.begin(), j )] = traffic.get_time();
+  iter2->second.first[std::distance (cpv.begin(), j )] = traffic.get_time();
 
   return next_m_to;
 }
@@ -277,7 +279,16 @@ void justine::robocar::Car::nextSmarterEdge ( void )
   size_t nes = traffic.nedges ( next_m_from );
   if ( !nes )
     return;
-  osmium::unsigned_object_id_type next_m_to = std::rand() % nes;
+  //osmium::unsigned_object_id_type next_m_to = std::rand() % nes;
+//
+  double_vector prv = traffic.GetProbVect(next_m_from);
+
+  boost::random::mt19937 gen;
+  boost::random::discrete_distribution<> dist(prv);
+  gen.seed(static_cast<unsigned int>(std::time(0)));
+
+  osmium::unsigned_object_id_type next_m_to = dist(gen);
+//
 
   if ( traffic.alist ( next_m_from, next_m_to ) == m_from )
     next_m_to = ( next_m_to + 1 ) % nes;

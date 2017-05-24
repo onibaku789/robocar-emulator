@@ -110,8 +110,8 @@ public:
 
           for ( auto noderef : iter->second.m_alist )
             {
-              AntCar::alist[iter->first].push_back ( 1 );
-              AntCar::alist_evaporate[iter->first].push_back ( 1 );
+              AntCar::alist[iter->first].first.push_back ( 1 );
+              AntCar::alist_evaporate[iter->first].first.push_back ( 1 );
             }
         }
 
@@ -310,6 +310,16 @@ public:
     return iter->second.m_alist[to];
   }
 
+//
+double_vector GetProbVect(osmium::unsigned_object_id_type from) const
+{
+  shm_map_Type::iterator iter=shm_map->find(from);
+   return iter->second.m_problist;
+}
+
+
+//
+
   int alist_inv ( osmium::unsigned_object_id_type from, osmium::unsigned_object_id_type to ) const
   {
     shm_map_Type::iterator iter=shm_map->find ( from );
@@ -422,7 +432,7 @@ public:
   {
     return m_time;
   }
-  
+
 protected:
 
   boost::interprocess::managed_shared_memory *segment;
@@ -461,4 +471,3 @@ private:
 } // justine::robocar::
 
 #endif // ROBOCAR_TRAFFIC_HPP
-

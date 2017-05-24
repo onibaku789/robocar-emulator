@@ -58,6 +58,10 @@ typedef boost::interprocess::allocator<void, segment_manager_Type> void_allocato
 typedef boost::interprocess::allocator<unsigned int, segment_manager_Type> uint_allocator;
 typedef boost::interprocess::vector<unsigned int, uint_allocator> uint_vector;
 typedef boost::interprocess::allocator<uint_vector, segment_manager_Type> uint_vector_allocator;
+//
+typedef boost::interprocess::allocator<double, segment_manager_Type> double_allocator;
+typedef boost::interprocess::vector<double, double_allocator> double_vector;
+//
 
 class SharedData
 {
@@ -66,12 +70,14 @@ public:
   uint_vector m_alist;
   uint_vector m_salist;
   uint_vector m_palist;
-
+//
+ double_vector m_problist;
+//
   int lon;
   int lat;
 
   SharedData ( const void_allocator &void_alloc )
-    :  m_alist ( void_alloc ), m_salist ( void_alloc ), m_palist ( void_alloc )
+    :  m_alist ( void_alloc ), m_salist ( void_alloc ), m_palist ( void_alloc ),m_problist( void_alloc )
   {}
 };
 
@@ -177,15 +183,20 @@ public:
             v.lon = m_waynode_locations[ iter->first ].x();
             v.lat = m_waynode_locations[ iter->first ].y();
 
-            for ( WayNodesVect::iterator noderefi = iter->second.begin();
-                  noderefi!= iter->second.end(); ++noderefi )
+            for ( WayNodesVect::iterator noderefi = iter->second.first.begin();
+                  noderefi!= iter->second.first.end(); ++noderefi )
               {
 
                 v.m_alist.push_back ( *noderefi );
                 v.m_salist.push_back ( 0u );
-                v.m_palist.push_back ( palist[iter->first][std::distance ( iter->second.begin(), noderefi )]+1 );
+                v.m_palist.push_back ( palist[iter->first].first[std::distance ( iter->second.first.begin(), noderefi )]+1 );
               }
-
+//
+              for (ProbabilityVect::iterator prob = iter->second.second.begin(); prob != iter->second.second.end(); prob++ )
+              {
+                  v.m_problist.push_back(*prob);
+              }
+//
             map_pair_Type p ( iter->first, v );
             shm_map_n->insert ( p );
           }
@@ -194,13 +205,14 @@ public:
         std::cout << " alist.size = " << alist.size() << " (deg- >= 1)"<< std::endl;
         std::cout << " SHM/alist.size = " << shm_map_n->size() << std::endl;
 #endif
-
-
+//
+ printAdjacencySparseMatrix(alist);
+//
       }
     catch ( boost::interprocess::bad_alloc e )
       {
 
-        std::cerr << " Out of shared memory..." << std::cerr;
+        std::cerr << " Out of shared memory..." << std::endl;
         std::cout << e.what() <<std::endl;
 
         std::cerr
@@ -262,7 +274,31 @@ public:
     return "Unknown";
 
   }
+//
+  void printAdjacencySparseMatrix(AdjacencyList alist){
 
+    std::fstream adjacencySparseMatrixFile ( "../adjacencysparsematrix.txt", std::ios_base::out );
+
+    for (AdjacencyList::iterator alist_iter = alist.begin(); alist_iter != alist.end(); alist_iter++){
+
+      WayNodesProbability actNodeProbabilities = alist_iter->second;
+
+      for (int i = 0; i < actNodeProbabilities.first.size(); i++){
+
+        adjacencySparseMatrixFile << alist_iter->first;
+        adjacencySparseMatrixFile << " ";
+
+        adjacencySparseMatrixFile << actNodeProbabilities.first.at(i);
+        adjacencySparseMatrixFile << " ";
+        adjacencySparseMatrixFile << actNodeProbabilities.second.at(i);
+        adjacencySparseMatrixFile << "\n";
+      }
+
+  }
+
+    adjacencySparseMatrixFile.close();
+  }
+//
   void processes ( )
   {
     std::unique_lock<std::mutex> lk ( m_mutex );
@@ -366,6 +402,3 @@ private:
 
 
 #endif // ROBOCAR_SMARTCITY_HPP
-
-
-

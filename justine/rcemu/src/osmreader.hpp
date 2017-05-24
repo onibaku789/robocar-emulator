@@ -43,6 +43,7 @@
 #include <osmium/handler/node_locations_for_ways.hpp>
 #include <osmium/geom/haversine.hpp>
 #include <osmium/geom/coordinates.hpp>
+#include <google/protobuf/descriptor.h>
 #include <iostream>
 #include <map>
 #include <set>
@@ -61,12 +62,20 @@ namespace robocar
 typedef osmium::index::map::SparseMemMap<osmium::unsigned_object_id_type, osmium::Location> OSMLocations;
 
 typedef std::vector<osmium::unsigned_object_id_type> WayNodesVect;
+
+//
+typedef std::vector<double> ProbabilityVect;
+typedef std::pair<WayNodesVect, ProbabilityVect> WayNodesProbability;
+//
+
 typedef std::map<std::string, WayNodesVect> WayNodesMap;
 //typedef osmium::index::map::StlMap<osmium::unsigned_object_id_type, osmium::Location> WaynodeLocations;
 typedef std::map<osmium::unsigned_object_id_type, osmium::Location> WaynodeLocations;
 typedef std::map<osmium::unsigned_object_id_type, WayNodesVect> Way2Nodes;
 
-typedef std::map<osmium::unsigned_object_id_type, WayNodesVect> AdjacencyList;
+//typedef std::map<osmium::unsigned_object_id_type, WayNodesVect> AdjacencyList;
+typedef std::map<osmium::unsigned_object_id_type, WayNodesProbability> AdjacencyList;
+
 typedef osmium::index::map::SparseMemMap<osmium::unsigned_object_id_type, int > Vertices;
 
 typedef std::map<osmium::unsigned_object_id_type, std::string> WayNames;
@@ -140,10 +149,10 @@ public:
           {
 
             sum_vertices.insert ( busit->first );
-            sum_edges+=busit->second.size();
-            node_degrees[busit->second.size()]++;
+            sum_edges+=busit->second.first.size();
+            node_degrees[busit->second.first.size()]++;
 
-            for ( const auto &v : busit->second )
+            for ( const auto &v : busit->second.first )
               {
                 sum_vertices.insert ( v );
               }
@@ -188,7 +197,7 @@ public:
 
   inline bool edge ( osmium::unsigned_object_id_type v1, osmium::unsigned_object_id_type v2 )
   {
-    return ( std::find ( alist[v1].begin(), alist[v1].end(), v2 ) != alist[v1].end() );
+    return ( std::find ( alist[v1].first.begin(), alist[v1].first.end(), v2 ) != alist[v1].first.end() );
   }
 
   void node ( osmium::Node& node )
@@ -199,6 +208,8 @@ public:
   int onewayc {0};
   int onewayf {false};
 
+
+
   void way ( osmium::Way& way )
   {
 
@@ -207,13 +218,45 @@ public:
       return;
     // http://wiki.openstreetmap.org/wiki/Key:highway
     if ( !strcmp ( highway, "footway" )
-         || !strcmp ( highway, "cycleway" )
+         || !strcmp ( highway, "cyclewa/media/thedankmemeguy/UUI/Budapest.osmy" )
          || !strcmp ( highway, "bridleway" )
          || !strcmp ( highway, "steps" )
          || !strcmp ( highway, "path" )
          || !strcmp ( highway, "construction" ) )
       return;
+//
+      double speed=5.0;
+      if(!strcmp(highway, "primaly"))
+      {
+        speed = 1.0;
+      }
 
+      if(!strcmp(highway, "secondary"))
+      {
+        speed = 2.0;
+      }
+
+      if(!strcmp(highway, "tertiary"))
+      {
+        speed = 3.0;
+      }
+
+      if(!strcmp(highway, "unclassified"))
+      {
+        speed = 4.0;
+      }
+
+      if(!strcmp(highway, "residential"))
+      {
+        speed = 7.0;
+      }
+
+      if(!strcmp(highway, "service"))
+      {
+        speed = 8.0;
+      }
+
+//
     onewayf = false;
     const char* oneway = way.tags() ["oneway"];
     if ( oneway )
@@ -269,12 +312,20 @@ public:
 
             if ( !edge ( vertex_old, vertex ) )
               {
+//
+                alist[vertex_old].first.push_back ( vertex );
+                alist[vertex_old].second.push_back(0.0);
+                int out_degree = alist[vertex_old].first.size();
 
-                alist[vertex_old].push_back ( vertex );
+                for (int i = 0; i < out_degree; i++)
+                {
+                  alist[vertex_old].second.at(i) = 1/(double)out_degree;
+                }
+//
 
                 double edge_length = distance ( vertex_old, vertex );
 
-                palist[vertex_old].push_back ( edge_length / 3.0 );
+                palist[vertex_old].first.push_back ( edge_length / speed );//
 
                 if ( edge_length>max_edge_length )
                   max_edge_length = edge_length;
@@ -294,12 +345,19 @@ public:
 
                 if ( !edge ( vertex, vertex_old ) )
                   {
+//
+                    alist[vertex].first.push_back ( vertex_old );
+                    alist[vertex].second.push_back(0.0);
+                    int out_degree = alist[vertex].first.size();
 
-                    alist[vertex].push_back ( vertex_old );
-
+                    for (int i = 0; i < out_degree; i++)
+                    {
+                      alist[vertex].second.at(i) = 1/(double)out_degree;
+                    }
+//
                     double edge_length = distance ( vertex_old, vertex );
 
-                    palist[vertex].push_back ( edge_length / 3.0 );
+                    palist[vertex].first.push_back ( edge_length / speed );
 
                     if ( edge_length>max_edge_length )
                       max_edge_length = edge_length;
@@ -412,4 +470,3 @@ private:
 } // justine::robocar::
 
 #endif // ROBOCAR_OSMREADER_HPP
-
